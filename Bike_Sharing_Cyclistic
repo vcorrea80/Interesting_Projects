@@ -1,0 +1,92 @@
+## Installing Packages for Project
+
+install.packages ("tidyverse")
+install.packages ("ggplot2")
+install.packages ("here")
+install.packages ("skimr")
+install.packages ("janitor")
+install.packages ("Tmisc")
+install.packages ("SimDesign")
+install.packages ("plyr")
+install.packages ("zoo")
+install.packages("xlsx")
+
+## Loading the library for the package installed
+
+library(tidyverse)
+library(ggplot2)
+library(here)
+library(skimr)
+library(janitor)
+library(Tmisc)
+library(SimDesign)
+library(plyr)
+library(lubridate)
+library(zoo)
+library(xlsx)
+
+## Invstigating DATA Frame
+
+summary(dfb) ## try to give some stats on the data frame
+glimpse(dfb) ## gives the structure of the data
+head(dfb) ## tibble with a summary of the columns and their DATA Structure Type
+
+## Loading and Merging the DATA
+
+data_all_1 <- list.files(path = "~/Documents/RData_Source/Cyclist-Bike-Share-Data/", pattern = "*.csv", full.names = TRUE) %>%
+  lapply(read_csv) %>%
+  bind_rows
+
+## Creating a Secondary Data Frame for Analysis
+
+dfa <- data_all_1  
+
+## Adding Meaningful Columns to the Data Frame
+
+dfa$year <- strftime(dfa$started_at, "%Y")
+dfa$month <- strftime(dfa$started_at, "%Y/%m")
+dfa$pickupdate <- strftime(dfa$started_at, "%Y/%m/%d")
+dfa$pickuphour <- strftime(dfa$started_at, "%H")
+dfa$weekday <- weekdays(dfa$started_at)
+dfa$rides <- c(1)
+dfa$diff_time <- difftime(dfa$started_at, dfa$ended_at, units="mins")
+
+## Fixing the Order of Weekday in dfa data frame
+
+dfa$weekday <- factor(dfa$weekday, levels=c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+factor(dfa$weekday)
+
+## Adding Holidays Table
+
+library(readr)
+holidays <- read_csv("Holiday-Data/000001-national-hollidays.csv")
+
+holidays$date2 <- strftime(holidays$date, "%Y/%m/%d") ## to change data type to chr
+
+## Merging dfa with holidays
+
+dfb <- full_join(dfa, holidays, by=c("pickupdate" = "date2"))
+
+dfb$isholiday <- ifelse (is.na(dfb$holiday_name), "no", "yes") ## adding column for indication of holiday
+
+## Creating Analysis Data Frames with Aggregate function
+
+byweekday <- aggregate(dfb$rides, by = list (dfb$member_casual, dfb$weekday, dfb$isholiday), FUN = sum) ## Member Type by Weekday
+bytypebike <- aggregate(dfb$rides, by = list(dfb$member_casual, dfb$weekday, dfb$rideable_type, dfb$isholiday), FUN = sum) ## Member Type by Weekday by Type of Bike
+bymonth <- aggregate(dfb$rides, by = list (dfb$member_casual, dfb$month, dfb$isholiday), FUN = sum) ## Member Type by Month
+byhour <- aggregate(dfb$rides, by = list (dfb$pickuphour, dfb$isholiday), FUN = sum) ## Rides by Pickup Hour
+
+## Most popular station
+poppickstation <- aggregate(dfb$rides, by = list (dfb$start_station_name), FUN = sum) ## Qtde rides by Pickup Locations
+poppickstation <- poppickstation[order(poppickstation$x, decreasing = TRUE) [1:5], ] ## Top 5 Stations for Pickup
+
+poppickstationmember <- aggregate(dfb$rides, by = list (dfb$member_casual, dfb$start_station_name), FUN = sum) ## Qtde rides by Pickup Locations by type of member
+
+## Exporting Results
+
+write.csv(byhour,"~/Documents/RData_Source/byhour.csv", row.names = FALSE)
+write.csv(bymonth,"~/Documents/RData_Source/bymonth.csv", row.names = FALSE)
+write.csv(bytypebike,"~/Documents/RData_Source/bytypebike.csv", row.names = FALSE)
+write.csv(byweekday,"~/Documents/RData_Source/byweekday.csv", row.names = FALSE)
+write.csv(poppickstation,"~/Documents/RData_Source/poppickstation.csv", row.names = FALSE)
+write.csv(poppickstationmember,"~/Documents/RData_Source/poppickstationmember.csv", row.names = FALSE)
